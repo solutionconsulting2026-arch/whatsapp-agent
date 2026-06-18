@@ -8,178 +8,156 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 
-// BusinessNext Agent Webhook URL
 const AGENT_URL =
 "https://presales.businessbywire.com/ambientflowgb8/flowaction/webhook/62122431-711b-4edd-8629-be45aefda75f/47feec02-a4c8-4f0f-8e46-abb4465fd7fd";
 
 
-
-// Health Check
-app.get("/", (req, res) => {
-
+// Test URL
+app.get("/", (req,res)=>{
     res.send("WhatsApp Agent Middleware Running 🚀");
-
 });
 
 
+// Split large WhatsApp messages
+function splitMessage(text, size = 1400){
 
-// Twilio WhatsApp Webhook
-app.post("/whatsapp", async (req, res) => {
+    const chunks = [];
 
+    for(let i = 0; i < text.length; i += size){
 
-    try {
+        chunks.push(
+            text.substring(i, i + size)
+        );
 
+    }
 
-        console.log("Incoming WhatsApp Request:");
-        console.log(req.body);
-
-
-        // WhatsApp User Message
-        const userMessage = req.body.Body;
-
-
-        console.log("User Message:", userMessage);
+    return chunks;
+}
 
 
 
-        // Convert Twilio Payload -> Agent Payload
-        const agentPayload = {
-
-            chatInput: [
-                {
-                    type: "text",
-                    text: userMessage
-                }
-            ]
-
-        };
+app.post("/whatsapp", async(req,res)=>{
 
 
-        console.log("Payload Sent To Agent:");
-        console.log(agentPayload);
+try{
 
 
+    const userMessage = req.body.Body;
 
-        // Call BusinessNext Agent
-        const agentResponse = await axios.post(
-            AGENT_URL,
-            agentPayload,
+
+    console.log(
+        "User:",
+        userMessage
+    );
+
+
+    const payload = {
+
+        chatInput:[
             {
-                headers: {
-                    "Content-Type": "application/json"
-                }
+                type:"text",
+                text:userMessage
             }
-        );
+        ]
+
+    };
 
 
-
-        console.log("Agent Raw Response:");
-        console.log(agentResponse.data);
-
-
-
-        let reply = "";
-
-
-
-        // Extract only message text
-
-        if (
-            agentResponse.data &&
-            agentResponse.data.text
-        ) {
-
-            reply = agentResponse.data.text;
-
+    const agentResponse = await axios.post(
+        AGENT_URL,
+        payload,
+        {
+            headers:{
+                "Content-Type":"application/json"
+            }
         }
+    );
 
-        else if (
-            agentResponse.data &&
-            agentResponse.data.response
-        ) {
 
-            reply = agentResponse.data.response;
-
-        }
-
-        else if (
-            agentResponse.data &&
-            agentResponse.data.output
-        ) {
-
-            reply = agentResponse.data.output;
-
-        }
-
-        else if (
-            typeof agentResponse.data === "string"
-        ) {
-
-            reply = agentResponse.data;
-
-        }
-
-        else {
-
-            reply = "No response received from agent.";
-
-        }
+    console.log(
+        "Agent:",
+        agentResponse.data
+    );
 
 
 
-        console.log("Reply Sent To WhatsApp:");
-        console.log(reply);
+    let reply = "";
 
 
+    if(agentResponse.data.text){
 
-        // Send response back to WhatsApp
-        const twiml = new MessagingResponse();
+        reply = agentResponse.data.text;
 
-        twiml.message(reply);
+    }
+    else if(agentResponse.data.response){
 
+        reply = agentResponse.data.response;
 
-        res.type("text/xml")
-           .send(twiml.toString());
+    }
+    else if(agentResponse.data.output){
 
+        reply = agentResponse.data.output;
 
+    }
+    else{
 
-    } catch (error) {
-
-
-        console.error(
-            "Error:",
-            error.message
-        );
-
-
-        const twiml = new MessagingResponse();
-
-
-        twiml.message(
-            "Sorry, I am unable to process your request right now."
-        );
-
-
-        res.type("text/xml")
-           .send(twiml.toString());
-
+        reply = JSON.stringify(agentResponse.data);
 
     }
 
 
+
+    const twiml = new MessagingResponse();
+
+
+    const parts = splitMessage(reply);
+
+
+    parts.forEach((part)=>{
+
+        twiml.message(part);
+
+    });
+
+
+    res.type("text/xml")
+       .send(twiml.toString());
+
+
+
+}
+catch(err){
+
+
+    console.log(err);
+
+
+    const twiml = new MessagingResponse();
+
+
+    twiml.message(
+        "Unable to get agent response."
+    );
+
+
+    res.type("text/xml")
+       .send(twiml.toString());
+
+
+}
+
+
 });
 
 
 
-
-// Render / Cloud Port
 const PORT = process.env.PORT || 3000;
 
 
-app.listen(PORT, () => {
+app.listen(PORT,()=>{
 
     console.log(
-        `WhatsApp Agent Running on Port ${PORT}`
+        "WhatsApp Agent Running on " + PORT
     );
 
 });
