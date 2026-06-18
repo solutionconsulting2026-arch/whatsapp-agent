@@ -8,29 +8,33 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 
-// BusinessNext Agent Webhook
+// BusinessNext Agent Webhook URL
 const AGENT_URL =
 "https://presales.businessbywire.com/ambientflowgb8/flowaction/webhook/62122431-711b-4edd-8629-be45aefda75f/47feec02-a4c8-4f0f-8e46-abb4465fd7fd";
 
 
 
 // Health Check
-app.get("/", (req,res)=>{
+app.get("/", (req, res) => {
+
     res.send("WhatsApp Agent Middleware Running 🚀");
+
 });
 
 
 
-// WhatsApp Webhook
-app.post("/whatsapp", async (req,res)=>{
+// Twilio WhatsApp Webhook
+app.post("/whatsapp", async (req, res) => {
+
 
     try {
 
-        console.log("Incoming WhatsApp Payload:");
+
+        console.log("Incoming WhatsApp Request:");
         console.log(req.body);
 
 
-        // Message from Twilio
+        // WhatsApp User Message
         const userMessage = req.body.Body;
 
 
@@ -38,20 +42,20 @@ app.post("/whatsapp", async (req,res)=>{
 
 
 
-        // Convert Twilio format to Agent format
+        // Convert Twilio Payload -> Agent Payload
         const agentPayload = {
 
-            chatInput:[
+            chatInput: [
                 {
-                    type:"text",
-                    text:userMessage
+                    type: "text",
+                    text: userMessage
                 }
             ]
 
         };
 
 
-        console.log("Sending to Agent:");
+        console.log("Payload Sent To Agent:");
         console.log(agentPayload);
 
 
@@ -61,88 +65,121 @@ app.post("/whatsapp", async (req,res)=>{
             AGENT_URL,
             agentPayload,
             {
-                headers:{
-                    "Content-Type":"application/json"
+                headers: {
+                    "Content-Type": "application/json"
                 }
             }
         );
 
 
-        console.log("Agent Response:");
+
+        console.log("Agent Raw Response:");
         console.log(agentResponse.data);
 
 
 
-        let reply;
+        let reply = "";
 
 
-        // Handling different response formats
-        if(typeof agentResponse.data === "string"){
 
-            reply = agentResponse.data;
+        // Extract only message text
+
+        if (
+            agentResponse.data &&
+            agentResponse.data.text
+        ) {
+
+            reply = agentResponse.data.text;
 
         }
-        else if(agentResponse.data.output){
 
-            reply = agentResponse.data.output;
-
-        }
-        else if(agentResponse.data.response){
+        else if (
+            agentResponse.data &&
+            agentResponse.data.response
+        ) {
 
             reply = agentResponse.data.response;
 
         }
+
+        else if (
+            agentResponse.data &&
+            agentResponse.data.output
+        ) {
+
+            reply = agentResponse.data.output;
+
+        }
+
+        else if (
+            typeof agentResponse.data === "string"
+        ) {
+
+            reply = agentResponse.data;
+
+        }
+
         else {
 
-            reply = JSON.stringify(agentResponse.data);
+            reply = "No response received from agent.";
 
         }
 
 
 
-        // Send back to WhatsApp
+        console.log("Reply Sent To WhatsApp:");
+        console.log(reply);
+
+
+
+        // Send response back to WhatsApp
         const twiml = new MessagingResponse();
 
         twiml.message(reply);
 
 
-        res.type("text/xml");
-        res.send(twiml.toString());
+        res.type("text/xml")
+           .send(twiml.toString());
 
 
-    }
-    catch(error){
+
+    } catch (error) {
+
 
         console.error(
-            "ERROR:",
+            "Error:",
             error.message
         );
 
 
         const twiml = new MessagingResponse();
 
+
         twiml.message(
-            "Sorry, agent is unavailable right now."
+            "Sorry, I am unable to process your request right now."
         );
 
 
         res.type("text/xml")
            .send(twiml.toString());
 
+
     }
+
 
 });
 
 
 
-// Render Dynamic Port
+
+// Render / Cloud Port
 const PORT = process.env.PORT || 3000;
 
 
-app.listen(PORT,()=>{
+app.listen(PORT, () => {
 
     console.log(
-        `WhatsApp Agent Running on port ${PORT}`
+        `WhatsApp Agent Running on Port ${PORT}`
     );
 
 });
