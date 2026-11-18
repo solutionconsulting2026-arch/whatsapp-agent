@@ -2,17 +2,20 @@
   "name": "agent-on-wa",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dev-server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node dev-server.js",
+    "start": "node dev-server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "axios": "^1.18.0",
-    "express": "^5.2.1",
-    "twilio": "^6.0.2"
+    "@vercel/functions": "^3.11.3",
+    "express": "^5.2.1"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
